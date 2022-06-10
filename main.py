@@ -305,6 +305,7 @@ def spawner(entities: list, **kwargs):
     else:
         spawn_timer += 1
 
+
 def enemy_garbage_collector(enemies: list,**kwargs):
     global player
     if "player" in locals()["kwargs"]:
@@ -314,7 +315,9 @@ def enemy_garbage_collector(enemies: list,**kwargs):
             player.score +=1
             enemies.pop(i)
 
+
 spawn_timer = 0
+
 
 def main():
     global screen, player

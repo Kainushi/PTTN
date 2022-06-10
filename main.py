@@ -12,6 +12,7 @@ background_color = 200, 200, 200
 game_clock = pygame.time.Clock()
 
 
+screen = pygame.display.set_mode(size)
 game_status = "MENU"
 words = ["memoryview", "bytearray", "bytes",
          "complex", "int", "float",
@@ -267,7 +268,7 @@ class Intro:
         screen.blit(self.title, self.rect)
 
 
-def switch_game_status(status: str,**kwargs):
+def switch_game_status(status: str):
     global game_status
     valid_game_status = ["START", "GAMEOVER", "MENU"]
     if status not in valid_game_status:
@@ -322,7 +323,6 @@ spawn_timer = 0
 def main():
     global screen, player
     player = Player()
-    screen = pygame.display.set_mode(size)
     pygame.init()
     entities = []
 

@@ -2,6 +2,7 @@
 import sys
 from dataclasses import dataclass
 from random import choice, randint
+from typing import Literal
 import pygame
 import zlib
 
@@ -82,7 +83,7 @@ quit_btn_img = zlib.decompress(b'x\x9c\xed\xd6MN\xc30\x10\x86a\xc3\n\xb1\xe1\xbe
     b'\xdf\xf0\xe0\xdc\xea\xf9\x11\x8c{\xd4\xdc4U\xbc\xa4\x9f\xd7z\xbdU\xeb{\xc4\x83\xdaN)\xcd\x92\xbe\xfe\xe7\x1d\x81'
     b'\xf7\x88qj\xb3\xd7\xbf\xe3\x9a\xf42')
 
-sprites  = {
+sprites = {
     "Villager":
     b'x\x9c\xed[;ND1\x0c\xdcC\xd0\xed\x1d\xa8h\xf6\x06\x08$h\xb8\x0c\x055\xa2\xe4 \xf4\x9c\x02\x89\x93 q\x81EA\xb2'
     b'\xf0F\xfeLb\xbf\xcf>b)by/cg\x1c\x132\t\xecv\xc3\x86\xfd\xd9\xc5~\x7f\xb4\xda\x96\xf1\xe5\xfd\xf7\xdb\x93\xd9,'
@@ -261,34 +262,68 @@ sprites  = {
     b'\x0f)\xb2$\xf3'
 }
 
-sprites = extract_sprites(sprites)
-#pygame.image.frombuffer(,(64, 64), "RGBA")
-#zlib.decompress()
 
-enemy_types = {
-        "Villager": {
-            "hp": 1,
-            "speed": .1,
-        "Blue Ninja": {
-            "hp": 1,
-            "speed": .15,
-        "Black Ninja": {
-            "hp": 1,
-            "speed": .2,
-        "Red Ninja": {
-            "hp": 1,
-            "speed": .3,
-        "Blue Samurai": {
-            "hp": 1,
-            "speed": .4,
-        "Gold Samurai": {
-            "hp": 1,
-            "speed": .5,
-        }}
+def bytes_to_surface(sprite: bytes, size: tuple,
+                     mode: Literal["P", "RGB", "BGR", "RGBX", "RGBA", "ARGB"]="RGBA" ) -> pygame.Surface :
+    """Convert sprite bytecode to a pygame surface
+    :arg sprite: sprite to convert
+    :arg size: a tuple of the image size
+    :arg mode: mode of the image (Defaults to "RGBA"
+    """
+    return pygame.image.frombuffer(sprite, size, mode)
 
 
+def topdown_spritesheet_to_movement(spritesheet: pygame.surface, size: tuple ) -> dict:
+    """Split the spritesheet to a dict of movement names containing a list of sprites ready to animate
 
-@dataclass
+    :param spritesheet: pygame surface
+    :param size: individual sprite final size
+    :return {"down":[sprites], "up":[sprites], "left":[sprites], "right":[sprites]}
+    :raise ValueError if spritesheet si incompatible with sprite size
+    """
+    if spritesheet.get_size()[0]%size[0] or spritesheet.get_size()[1]%size[1]:
+        raise ValueError("spritesheet size is not divisible by size")
+    walk_cycle = {
+        "down": [],  # Col 1
+        "up": [],  # Col 2
+        "left": [],  # Com 3
+        "right": []}  # Col 4
+    origin = [0, 0]
+    while origin[0] < spritesheet.get_size()[0]:
+        if origin[0] == 0:
+            direction = "down"
+        elif origin[0] == size[0]:
+            direction = "up"
+        elif origin[0] == size[0] * 2:
+            direction = "left"
+        else:
+            direction = "right"
+        while origin[1] < spritesheet.get_size()[1]:
+            new = pygame.Surface(size)
+            new.set_colorkey((0, 0, 0))
+            new.blit(spritesheet, (0, 0), (origin[0], origin[1], origin[0] + size[0], origin[1] + size[1]))
+            origin[1] += size[1]
+            walk_cycle[direction].append(new)
+        origin[1] = 0
+        origin[0] += size[0]
+    return walk_cycle
+
+
+def scale_sprite(sprite, scale):
+    return pygame.transform.scale(sprite, (sprite.get_size()[0] * scale, sprite.get_size()[1] * scale))
+
+
+for enemy_name, sprite in sprites.items():
+    """Convert each enemy spritesheet"""
+    sprite = bytes_to_surface(zlib.decompress(sprite), (64,64))
+    sprite = topdown_spritesheet_to_movement(sprite, (16, 16))
+    # scaling of all sprites
+    for key, value in sprite.items():
+        sprite[key] = [scale_sprite(e, 7) for e in value]
+    sprites[enemy_name] = sprite
+
+
+@dataclass()
 class Player:
     _score = 0
     score_max = 999_999
@@ -310,28 +345,22 @@ class Player:
 
 @dataclass()
 class Enemy:
-
-    _direction = "right"
     _current_sprite_id = 0
     _font = pygame.font.Font('freesansbold.ttf', 25)
     animation_delay = .005  # animation slowdown ratio
     animation_update_counter = .0
 
-    def __init__(self, e: str = None, pos: tuple = (0, 0)):
+    def __init__(self, e: str, sprites: tuple, pos: tuple = (0, 0), speed: float = .1,
+                 direction: Literal["up", "down", "left", "right"] = "right"):
         """
-        e: Enemy identifier
-        pos: spawn position(x,y)
+        :arg e: Enemy identifier
+        :arg pos: spawn position(x,y)
+        :arg speed: float of movement speed
         """
-        if not e:
-            e = choice(list(self._enemy_types.keys()))
-        if not isinstance(e, str):
-            raise ValueError(f"{self.__class__.__name__} e must be a string")
-        if e not in self._enemy_types:
-            raise ValueError(f"{self.__class__.__name__} e is unknown. See {self.__class__.__name__}._enemy_types")
-        self.speed = self._enemy_types[e]["speed"]
-        self.sprites = self.__import_sprites(self._enemy_types[e]["sprite_sheet"])
-        self.direction = "right"
-        self.sprite = self.sprites[self.direction][0]
+        self.speed = speed
+        self.sprites = sprites
+        self.direction = "right" # default direction
+        self.sprite = self.sprites[direction][0]
         self.rect = self.sprite.get_rect()
         self.rect.center = pos
         self.x = self.rect.x
@@ -360,35 +389,6 @@ class Enemy:
     @property
     def hp(self):
         return self._hp
-
-    @staticmethod
-    def __import_sprites(sprite_sheet):
-        sprite_size = 16
-        walk_cycle = {
-            "down": [],  # Col 1
-            "up": [],  # Col 2
-            "left": [],  # Com 3
-            "right": []}  # Col 4
-        origin = [0, 0]
-        while origin[0] < sprite_sheet.get_size()[0]:
-            if origin[0] == 0:
-                direction = "down"
-            elif origin[0] == sprite_size:
-                direction = "up"
-            elif origin[0] == sprite_size*2:
-                direction = "left"
-            else:
-                direction = "right"
-            while origin[1] < sprite_sheet.get_size()[1]:
-                new = pygame.Surface((16, 16))
-                new.set_colorkey((0, 0, 0))
-                new.blit(sprite_sheet, (0, 0), (origin[0], origin[1], origin[0]+sprite_size, origin[1]+sprite_size))
-                new = pygame.transform.scale(new, (new.get_size()[0]*7, new.get_size()[1]*7))
-                origin[1] += sprite_size
-                walk_cycle[direction].append(new)
-            origin[1] = 0
-            origin[0] += sprite_size
-        return walk_cycle
 
     def update_animation(self):
         if int(self.animation_update_counter) >= 1:
@@ -517,19 +517,21 @@ def spawner(entities: list, **kwargs):
     spawn_rate = randint(2500, 4000)
     if spawn_rate < spawn_timer:
         if 5 < player.score < 10:
-            spawn_table = ["Villager", "Blue Ninja"]
+            spawn_table = ["Villager", "Blue ninja"]
         elif 10 < player.score < 20:
-            spawn_table = ["Villager", "Blue Ninja", "Black Ninja"]
+            spawn_table = ["Villager", "Blue ninja", "Black ninja"]
         elif 20 < player.score < 40:
-            spawn_table = ["Villager", "Blue Ninja", "Black Ninja", "Red Ninja"]
+            spawn_table = ["Villager", "Blue ninja", "Black ninja", "Red ninja"]
         elif 40 < player.score < 50:
-            spawn_table = ["Villager", "Blue Ninja", "Black Ninja", "Red Ninja", "Blue Samurai"]
+            spawn_table = ["Villager", "Blue ninja", "Black ninja", "Red ninja", "Blue samurai"]
         elif 50 < player.score:
-            spawn_table = ["Villager", "Blue Ninja", "Black Ninja", "Red Ninja", "Blue Samurai", "Gold Samurai"]
+            spawn_table = ["Villager", "Blue ninja", "Black ninja", "Red ninja", "Blue samurai", "Gold samurai"]
         else:
             spawn_table = ["Villager"]
         spawn_timer = 0
-        entities.append(Enemy(choice(spawn_table), (-50, randint(50, height-32))))
+        enemy = choice(spawn_table)
+        enemy_speed = .07 * len(spawn_table)
+        entities.append(Enemy( enemy, sprites[enemy], (-50, randint(50, height-32)),enemy_speed, "right"))
     else:
         spawn_timer += 1
 

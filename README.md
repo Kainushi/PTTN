@@ -4,26 +4,28 @@
 In Python Type Typing Ninja, Daimyo Python sent his Ninjas and Samurai to raid your home for your food ! In this class 
 conflict, you'll have to defeat the noble's baddies to keep your precious sunflower oil and french mustard. To knock'em 
 out, you'll have to type their python type before they reach the noble's side (Far right, obviously)
-I'm using zlib toi compress images, pygames, random ton span enemies at random and at ramdom locations. I worked alone
+I'm using zlib toi compress images, pygames, random ton span enemies at random and at random locations. I worked alone
 and used a sprite set under CC0 licence, organized in sprite sheet pour ennemies' animations.
 
 ## Goals
 * Learn Pygame
-* develop some function du split sprite-sheets
+* develop some function to split sprite-sheets
 * Try some basic animation
 * Learn ho to manipulate text in pygame
 * Learn how to interact with the screen by mouse AND keyboard
 
 ## Constrains
 * No other external library than Pygame
-* No other external files that requirements and README.md
-* In less than 3 days
+* No other external files than requirements and README.md
+
+
 ## Credits:
 * Library [pygame](https://www.pygame.org)
 * Enemies' sprites: Ninja Adventure Asset Pack [Pixel-boy](https://pixel-boy.itch.io/) (CC0)
 
 ### More infos
 The code is organized in 5 classes and 3 functions
+
 #### Classes:
 **Player()** representing the player, to manage the score and later the name, and maybe playable character if I want add 
 some dodging mechanics on top of the typing
@@ -35,6 +37,7 @@ and a method to draw himself on the screen. Enemies are instanciated by spawner(
 al callback function is pased as a string and eval is used to execute the code.
 
 **Title()** and **Intro()** are here to write the title and intro text when initialized and called.
+
 #### Functions:
 **switch_game_status(status)** change the current state of the game. "START" for the gameplay loop, "GAMEOVER" for the 
 Game-over screen and "MENU" for the main menu

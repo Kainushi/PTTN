@@ -1,10 +1,11 @@
 """Python type typing ninja"""
 import sys
+import zlib
 from dataclasses import dataclass
 from random import choice, randint
 from typing import Literal
+
 import pygame
-import zlib
 
 DEBUG = True
 WIDTH, HEIGHT = 1280, 720
@@ -17,6 +18,7 @@ game_clock = pygame.time.Clock()
 screen = pygame.display.set_mode(size)
 game_status = "MENU"
 
+# Button images in bytecode
 start_btn_img = zlib.decompress(b'x\x9c\xed\x971N\xc40\x10\x00\r\x15\xa2\xe1\xbf\x88?\xf0\x06jJJ\xf8\x0c\xed=\x806\xe0'
                                 b'\x88D\xbe(\x97d\xed\xf5:\xb6g\xa5\xd1\x89\x9c\x1d\xdb\xbb\x93\xbd\xe0\xdcj\x0c\xd0\r{1\x8e\xfb\xf9t\xc3\xe5\xe3'
                                 b'\x1e\x1a\xc7\xd7y\xc7\x8d\xe1\xfb\xdd\xcdcK\xef\x17l\x9c\xf0\x9f\xbe\xee+^\x8c\xd7q\xa2/B\'V\xbc\xc0\x89\x0e'
@@ -98,7 +100,7 @@ def bytes_to_surface(sprite: bytes, size: tuple,
     return pygame.image.frombuffer(sprite, size, mode)
 
 
-def topdown_spritesheet_to_movement(spritesheet: pygame.surface, size: tuple) -> dict:
+def topdown_spritesheet_to_movement(spritesheet: pygame.Surface, size: tuple) -> dict:
     """Split the spritesheet to a dict of movement names containing a list of sprites ready to animate
 
     :param spritesheet: pygame surface
@@ -107,14 +109,18 @@ def topdown_spritesheet_to_movement(spritesheet: pygame.surface, size: tuple) ->
     :raise ValueError if spritesheet si incompatible with sprite size
     """
     if spritesheet.get_size()[0] % size[0] or spritesheet.get_size()[1] % size[1]:
+        # check if the sprite sheet size is compatible with the sprite size.
         raise ValueError("spritesheet size is not divisible by size")
+    
     walk_cycle = {
         "down": [],  # Col 1
         "up": [],  # Col 2
-        "left": [],  # Com 3
+        "left": [],  # Col 3
         "right": []}  # Col 4
+    
     origin = [0, 0]
     while origin[0] < spritesheet.get_size()[0]:
+        # Select the dict key for the current col
         if origin[0] == 0:
             direction = "down"
         elif origin[0] == size[0]:
@@ -123,18 +129,29 @@ def topdown_spritesheet_to_movement(spritesheet: pygame.surface, size: tuple) ->
             direction = "left"
         else:
             direction = "right"
+            
         while origin[1] < spritesheet.get_size()[1]:
-            new = pygame.Surface(size)
+            # For each line il the current col
+            new = pygame.Surface(size)  # Create a new surface
             new.set_colorkey((0, 0, 0))
-            new.blit(spritesheet, (0, 0), (origin[0], origin[1], origin[0] + size[0], origin[1] + size[1]))
-            origin[1] += size[1]
+            # Draw onto the new surface
+            new.blit(spritesheet,
+                     (0, 0), #  From origin of the new image
+                     # a Rect of the surface to draw 
+                     (origin[0],
+                      origin[1],
+                      origin[0] + size[0],  # Origin + sprite size for x
+                      origin[1] + size[1]))  # Origin + sprite size for y
             walk_cycle[direction].append(new)
-        origin[1] = 0
-        origin[0] += size[0]
+            origin[1] += size[1]  # Next raw
+            
+        origin[1] = 0  # Return on top
+        origin[0] += size[0]  # Next col.
     return walk_cycle
 
 
-def scale_sprite(sprite, scale):
+def scale_sprite(sprite: pygame.Surface, scale: int):
+    """Scale sprite by a factor of scale"""
     return pygame.transform.scale(sprite, (sprite.get_size()[0] * scale, sprite.get_size()[1] * scale))
 
 
@@ -150,12 +167,6 @@ class Player:
 
     @score.setter
     def score(self, i: int):
-        if not isinstance(i, int):
-            raise ValueError(f"{self.__class__.__name__}.score must be an integer")
-        if i < 0:
-            raise ValueError(f"{self.__class__.__name__}.score must be a positive")
-        if i >= self.score_max:
-            i = self.score_max
         self._score = i
 
     @property
@@ -174,6 +185,7 @@ class Enemy:
     _font = pygame.font.Font('freesansbold.ttf', 25)
     animation_delay = .005  # animation slowdown ratio
     animation_update_counter = .0
+    # Dict of possible enemies withe their properties
     _enemies = {
         "Villager": {"base_speed": .01},
         "Blue samurai": {"base_speed": .03},
@@ -181,9 +193,11 @@ class Enemy:
         "Black ninja": {"base_speed": .1},
         "Red ninja": {"base_speed": .3},
         "Gold samurai": {"base_speed": .45}}
+    # List of possible words
     _words = ["memoryview", "bytearray", "bytes", "complex",
                   "int", "float", "set", "frozenset", "tuple",
                   "range", "list", "dict", "bool", "str"]
+    # Enemies sprites bytecode
     _sprites = {
     "Villager":
         b'x\x9c\xed[;ND1\x0c\xdcC\xd0\xed\x1d\xa8h\xf6\x06\x08$h\xb8\x0c\x055\xa2\xe4 \xf4\x9c\x02\x89\x93 q\x81EA\xb2'
@@ -360,17 +374,8 @@ class Enemy:
         b'\x91\xdaa2{\xffa\xcf\xab\xf3\x7f\xb5a\xf5l\x8e\xebl\xfe\x1f\xc5\x11\xde\xadu\xff\xa1\xfaF\xf3w\xad!\xb6\xa7'
         b'\xcd7qve\x06\x9d\xcd"\x95Cd?/\x079\xf6{\xef\x9d\xf8\x8c(~m\x9d\xfd_\x01>\x9f\xf9\xab\xedp\xae7\xdb\xae\xf8\x81'
         b'\xf7\xa9\xf2G,{\xbe\x8b\xf8C?\xe6\x0f}\xb5\x7f\xcf\xe6\xff\xac\xbf\xd6\xba\xd6\x0c:\xe3\x0e\xfbVr\x07k+6\xf8'
-        b'\x0f)\xb2$\xf3'
-}
-    for enemy_name, sprite in _sprites.items():
-        """Convert each enemy spritesheet"""
-        sprite = bytes_to_surface(zlib.decompress(sprite), (64, 64))
-        sprite = topdown_spritesheet_to_movement(sprite, (16, 16))
-        # scaling of all sprites
-        for key, value in sprite.items():
-            sprite[key] = [scale_sprite(e, 7) for e in value]
-        _sprites[enemy_name] = sprite
-
+        b'\x0f)\xb2$\xf3'}
+    
     def __init__(self, e: str,
                  pos: tuple = (0, 0),
                  direction: Literal["up", "down", "left", "right"] = "right",
@@ -380,13 +385,21 @@ class Enemy:
         :arg pos: spawn position(x,y)
         :arg speed_mod: int modifies movement-speed by a factor of speed_mod
         """
+        
+        # Convert each enemy spritesheet
+        sprite = bytes_to_surface(zlib.decompress(self._sprites[e]), (64, 64))
+        sprite = topdown_spritesheet_to_movement(sprite, (16, 16))
+        # scaling of all sprites
+        for key, value in sprite.items():
+            sprite[key] = [scale_sprite(e, 7) for e in value]
+        self.sprites = sprite
+        
         speed_mod = speed_mod if speed_mod > 0 else 1
-        self.sprites = self._sprites[e]
-        self.direction = direction  # default direction
-        self.speed = self._enemies[e]["base_speed"]*speed_mod
+        self.direction = direction
+        self.speed = self._enemies[e]["base_speed"]*speed_mod  # Define speed of the entity
         self.sprite = self.sprites[self._direction][0]
         self.rect = self.sprite.get_rect()
-        self.rect.center = pos
+        self.rect.center = pos  # Move center of the sprite to pos
         self.x = self.rect.x
         self.y = self.rect.y
         temp_text = choice(self._words)
@@ -400,7 +413,7 @@ class Enemy:
                 temp_text = choice(self._words)
         self._text = temp_text  # Text to type to defeat the enemy
         self._hp = len(self._text)
-        self.update_text()
+        self.update_text()  # updates text b
         self.text_render = self._font.render(self._text[0 - self._hp:], True, (150, 0, 150), (255, 255, 255))
         _, self.text_h = self.text_render.get_size()
         # Debug print
@@ -455,14 +468,14 @@ class Enemy:
         self.rect.x, self.rect.y = int(self.x), int(self.y)
 
     def update_text(self):
-        if self._hp == 0:
-            self.text_render = self._font.render("", True, (150, 0, 150), (255, 255, 255))
-        else:
+        if self._hp:
             self.text_render = self._font.render(
-                self._text[0 - self._hp:],
+                # Display noting if text emply to avoid an index error
+                self._text[0 - self._hp:] if self._hp else "", 
                 True,
                 (150, 0, 150),
                 (255, 255, 255))
+
 
     def draw(self):
         screen.blit(self.sprite, self.rect)
@@ -484,8 +497,9 @@ class Button:
         self.rect.center = (x, y)
 
     def clic(self, event):
-        x, y = pygame.mouse.get_pos()
+        x, y = pygame.mouse.get_pos() # Get cursor position
         if event.type == pygame.MOUSEBUTTONDOWN:
+            # if the cursor collides with the button on click
             if self.rect.collidepoint(x, y):
                 eval(self.callback)
 
@@ -503,7 +517,8 @@ class Title:
         font = pygame.font.Font('freesansbold.ttf', 15)
         self.title = font.render(text, False, (255, 255, 255))
         self.rect = self.title.get_rect()
-        self.title = pygame.transform.scale(self.title, (self.rect.w * 5, self.rect.h * 5))
+        self.title = pygame.transform.scale(
+            self.title, (self.rect.w * 5, self.rect.h * 5))
         self.rect = self.title.get_rect()
         self.rect.center = (x, y)
 
@@ -540,12 +555,6 @@ def switch_game_status(status: str):
         game_status = status
         if game_status == "START":
             player.score = 0
-
-
-def level_manager(player):
-    """Define des level up conditions for difficulty adjustement"""
-    if player.score == player.score % 15:
-        player.score += 1
 
 
 @singleton
@@ -585,7 +594,8 @@ class Spawner:
     def spawn(self):
         enemy = choice(self.enemies[:self.difficulty])
         self.entities.append(Enemy(enemy, (-50, randint(50, HEIGHT - 32)),))
-        self.spawn_range = self.spawn_range[0] - player.score*300, self.spawn_range[1] - player.score*300
+        self.spawn_range = (self.spawn_range[0] - player.score*300,
+                            self.spawn_range[1] - player.score*300)
 
 
 
@@ -612,6 +622,7 @@ def main():
             if len(entities) > 0:
                 for i, e in enumerate(entities):
                     if e.rect.center[0] > WIDTH:
+                        # if an entitie exists the screen on the right
                         entities.clear()
                         switch_game_status("GAMEOVER")
                     else:
@@ -627,7 +638,7 @@ def main():
                         e.update_animation()
                         e.move("right")
                         e.draw()
-            spawner.update()
+            spawner.update()  # Enemy spawn manager
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     sys.exit()
@@ -641,16 +652,25 @@ def main():
                             print(f"Score forced at {player.score}")
                     # Debug
                     for e in entities:
+                        # pass keys types to each entity to check for hits
                         e.hit(event)
 
         elif game_status == "MENU":
+            """ Menu screen """
             screen.fill(background_color)
+            
             Title("Python Type Typing Ninja", (WIDTH / 2, 100)).draw()
-            line1 = Intro("Type the Python types to knock out the ninjas", (WIDTH / 2, HEIGHT / 2))
+            line1 = Intro("Type the Python types to knock out the ninjas",
+                          (WIDTH / 2, HEIGHT / 2))  # Middle of the 
             line1.draw()
-            Intro("before they cross the finish line", (WIDTH / 2, HEIGHT / 2 + line1.rect.h)).draw()
-            start_btn = Button(start_btn_img, (133, 67), (WIDTH / 2, HEIGHT - 150), "switch_game_status('START')")
+            
+            Intro("before they cross the finish line", 
+                  (WIDTH / 2, HEIGHT / 2 + line1.rect.h)).draw()
+            
+            start_btn = Button(start_btn_img, (133, 67), 
+                               (WIDTH / 2, HEIGHT - 150), "switch_game_status('START')")
             start_btn.draw()
+            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     sys.exit()
@@ -658,12 +678,20 @@ def main():
                     start_btn.clic(event)
 
         elif game_status == "GAMEOVER":
+            """ Game over screen"""
             screen.fill(background_color)
-            Title("GAME OVER", (WIDTH / 2, 100)).draw()
-            Title(f"SCORE: {player.score}", (int(WIDTH / 2), int(HEIGHT / 2))).draw()
-            menu_btn = Button(menu_btn_img, (133, 67), (int(WIDTH / 4), int(HEIGHT / 5) * 4),
+            Title("GAME OVER", (WIDTH / 2, 100)).draw()  # 100px from top, centered
+            Title(f"SCORE: {player.score}", (int(WIDTH / 2), int(HEIGHT / 2))).draw()  # Centered
+            menu_btn = Button(menu_btn_img, 
+                              (133, 67), 
+                              (int(WIDTH / 4), int(HEIGHT / 5) * 4),
                               "switch_game_status('MENU')")
-            quit_btn = Button(quit_btn_img, (133, 67), (int(WIDTH / 4) * 2, int(HEIGHT / 5) * 4), "sys.exit()")
+            
+            quit_btn = Button(quit_btn_img, 
+                              (133, 67), 
+                              (int(WIDTH / 4) * 2, int(HEIGHT / 5) * 4),  # é
+                              "sys.exit()")
+            
             retry_btn = Button(retry_btn_img, (133, 67), (int(WIDTH / 4) * 3, int(HEIGHT / 5) * 4),
                                "switch_game_status('START')")
             menu_btn.draw()
